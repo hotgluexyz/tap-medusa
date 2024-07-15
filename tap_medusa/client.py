@@ -65,6 +65,7 @@ class MedusaStream(RESTStream):
             "password": self.config.get("password"),
         }
         
+        access_token = self._tap._config.get("access_token")
         if not self.is_token_valid():
             access_token = requests.post(
                 url=f"{self.url_base}/auth/token",
