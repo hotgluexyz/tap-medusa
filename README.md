@@ -29,8 +29,6 @@ Sample config:
 }
 ```
 
-Built with the [Meltano Tap SDK](https://sdk.meltano.com) for Singer Taps.
-
 ### Source Authentication and Authorization
 
 ## Usage

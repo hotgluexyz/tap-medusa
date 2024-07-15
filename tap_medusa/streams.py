@@ -471,7 +471,7 @@ class ReturnsStream(MedusaStream):
     name = "returns"
     path = "/returns"
     primary_keys = ["id"]
-    replication_key = "updated_at"
+    replication_key = None
     records_jsonpath = "$.returns[*]"
 
     schema = th.PropertiesList(

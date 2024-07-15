@@ -45,6 +45,18 @@ class MedusaStream(RESTStream):
         # add authentication header
         headers["Authorization"] = f"Bearer {self.get_access_token()}"
         return headers
+    
+    def is_token_valid(self) -> bool:
+        access_token = self._tap._config.get("access_token")
+        now = round(datetime.datetime.utcnow().timestamp())
+        expires_in = self._tap.config.get("expires_in")
+        if expires_in is not None:
+            expires_in = int(expires_in)
+        if not access_token:
+            return False
+        if not expires_in:
+            return False
+        return not ((expires_in - now) < 120)
 
     def get_access_token(self):
         headers = {"Content-Type": "application/json"}
@@ -52,12 +64,8 @@ class MedusaStream(RESTStream):
             "email": self.config.get("email"),
             "password": self.config.get("password"),
         }
-
-        # get access_token if not available in config file
-        if self.config.get("access_token"):
-            access_token = self.config.get("access_token")
-
-        else:
+        
+        if not self.is_token_valid():
             access_token = requests.post(
                 url=f"{self.url_base}/auth/token",
                 data=json.dumps(login_data),
@@ -66,6 +74,8 @@ class MedusaStream(RESTStream):
             self.validate_response(access_token)
             access_token = access_token.json()["access_token"]
             self._tap._config["access_token"] = access_token
+            now = round((datetime.datetime.utcnow() + datetime.timedelta(minutes=15)).timestamp())
+            self._tap._config["expires_in"] = now
 
             # write access token in config file
             with open(self._tap.config_file, "w") as outfile:
