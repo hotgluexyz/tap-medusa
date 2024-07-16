@@ -53,10 +53,10 @@ item = th.ObjectType(
     th.Property("has_shipping", th.BooleanType),
     th.Property("unit_price", th.NumberType),
     th.Property("variant_id", th.StringType),
-    th.Property("quantity", th.NumberType),
-    th.Property("fulfilled_quantity", th.StringType),
-    th.Property("returned_quantity", th.StringType),
-    th.Property("shipped_quantity", th.StringType),
+    th.Property("quantity", th.IntegerType),
+    th.Property("fulfilled_quantity", th.IntegerType),
+    th.Property("returned_quantity", th.IntegerType),
+    th.Property("shipped_quantity", th.IntegerType),
     th.Property("metadata", th.CustomType({"type": ["object", "string"]})),
     th.Property(
         "product",
@@ -346,14 +346,16 @@ class OrdersStream(MedusaStream):
     primary_keys = ["id"]
     replication_key = "updated_at"
     records_jsonpath = "$.orders[*]"
+    additional_params = {"fields" : "id,updated_at,status,fulfillment_status,payment_status,display_id,cart_id,customer_id,email,region_id,currency_code,tax_rate,draft_order_id,canceled_at,no_notification,sales_channel_id,metadata,external_id"} 
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
+        th.Property("external_id", th.StringType),
         th.Property("created_at", th.DateTimeType),
         th.Property("updated_at", th.DateTimeType),
         th.Property("status", th.StringType),
         th.Property("fulfillment_status", th.StringType),
         th.Property("payment_status", th.StringType),
-        th.Property("display_id", th.NumberType),
+        th.Property("display_id", th.IntegerType),
         th.Property("cart_id", th.StringType),
         th.Property("customer_id", th.StringType),
         th.Property("email", th.StringType),
@@ -462,6 +464,21 @@ class OrdersStream(MedusaStream):
         th.Property(
             "returns", th.ArrayType(th.CustomType({"type": ["object", "string"]}))
         ),
+        th.Property(
+            "swaps", th.ArrayType(th.CustomType({"type": ["object", "string"]}))
+        ),
+        th.Property("subtotal", th.NumberType),
+        th.Property("discount_total", th.NumberType),
+        th.Property("shipping_total", th.NumberType),
+        th.Property("refunded_total", th.NumberType),
+        th.Property("paid_total", th.NumberType),
+        th.Property("refundable_amount", th.NumberType),
+        th.Property("item_tax_total", th.NumberType),
+        th.Property("shipping_tax_total", th.NumberType),
+        th.Property("tax_total", th.NumberType),
+        th.Property("gift_card_total", th.NumberType),
+        th.Property("gift_card_tax_total", th.NumberType),
+        th.Property("total", th.NumberType),
     ).to_dict()
 
 
@@ -471,7 +488,7 @@ class ReturnsStream(MedusaStream):
     name = "returns"
     path = "/returns"
     primary_keys = ["id"]
-    replication_key = "updated_at"
+    replication_key = None
     records_jsonpath = "$.returns[*]"
 
     schema = th.PropertiesList(
