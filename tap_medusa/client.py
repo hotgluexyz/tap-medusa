@@ -27,6 +27,7 @@ class MedusaStream(RESTStream):
 
     records_jsonpath = "$[*]"
     user_logged = False
+    additional_params = {}
 
     @property
     def url_base(self):
@@ -75,7 +76,7 @@ class MedusaStream(RESTStream):
             self.validate_response(access_token)
             access_token = access_token.json()["access_token"]
             self._tap._config["access_token"] = access_token
-            now = round((datetime.datetime.utcnow() + datetime.timedelta(minutes=15)).timestamp())
+            now = round((datetime.datetime.utcnow() + datetime.timedelta(minutes=60)).timestamp())
             self._tap._config["expires_in"] = now
 
             # write access token in config file
@@ -107,6 +108,8 @@ class MedusaStream(RESTStream):
     ) -> Dict[str, Any]:
         """Return a dictionary of values to be used in URL parameterization."""
         params: dict = {}
+        if self.additional_params:
+            params.update(self.additional_params)
         if next_page_token:
             params["offset"] = next_page_token
         # filter by date
