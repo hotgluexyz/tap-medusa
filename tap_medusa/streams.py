@@ -154,6 +154,9 @@ class ProductsStream(MedusaStream):
     primary_keys = ["id"]
     replication_key = "updated_at"
     records_jsonpath = "$.products[*]"
+    additional_params = {
+        "expand": "images,options,options.values,profiles,sales_channels,tags,variants.options,variants.prices,collection,categories"
+    }
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("created_at", th.DateTimeType),
@@ -177,6 +180,9 @@ class ProductsStream(MedusaStream):
         th.Property("type_id", th.StringType),
         th.Property("discountable", th.BooleanType),
         th.Property("metadata", th.CustomType({"type": ["object", "string"]})),
+        th.Property(
+            "categories", th.ArrayType(th.CustomType({"type": ["object", "string"]}))
+        ),
         th.Property(
             "collection",
             th.ObjectType(
@@ -256,7 +262,9 @@ class ProductsStream(MedusaStream):
                 )
             ),
         ),
-        th.Property("tags", th.ArrayType(th.StringType)),
+        th.Property(
+            "tags", th.ArrayType(th.CustomType({"type": ["object", "string"]}))
+        ),
         th.Property("type", th.StringType),
         th.Property("type", th.StringType),
         th.Property(
@@ -346,7 +354,9 @@ class OrdersStream(MedusaStream):
     primary_keys = ["id"]
     replication_key = "updated_at"
     records_jsonpath = "$.orders[*]"
-    additional_params = {"fields" : "id,updated_at,status,fulfillment_status,payment_status,display_id,cart_id,customer_id,email,region_id,currency_code,tax_rate,draft_order_id,canceled_at,no_notification,sales_channel_id,metadata,external_id"} 
+    additional_params = {
+        "fields": "id,updated_at,status,fulfillment_status,payment_status,display_id,cart_id,customer_id,email,region_id,currency_code,tax_rate,draft_order_id,canceled_at,no_notification,sales_channel_id,metadata,external_id"
+    }
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("external_id", th.StringType),
@@ -490,6 +500,7 @@ class ReturnsStream(MedusaStream):
     primary_keys = ["id"]
     replication_key = None
     records_jsonpath = "$.returns[*]"
+    additional_params = {}
 
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
