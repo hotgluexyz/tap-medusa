@@ -35,12 +35,14 @@ class TapMedusa(Tap):
         th.Property(
             "email",
             th.StringType,
-            required=True,
         ),
         th.Property(
             "password",
             th.StringType,
-            required=True,
+        ),
+        th.Property(
+            "api_key",
+            th.StringType,
         ),
     ).to_dict()
 

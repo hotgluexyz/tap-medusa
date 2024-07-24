@@ -43,8 +43,12 @@ class MedusaStream(RESTStream):
         headers = {}
         if "user_agent" in self.config:
             headers["User-Agent"] = self.config.get("user_agent")
-        # add authentication header
-        headers["Authorization"] = f"Bearer {self.get_access_token()}"
+        # if api_key auth with api_key
+        if self.config.get("api_key"):
+            headers["x-medusa-access-token"] = self.config.get("api_key")
+        else:
+            # add authentication header
+            headers["Authorization"] = f"Bearer {self.get_access_token()}"
         return headers
     
     def is_token_valid(self) -> bool:
@@ -114,7 +118,7 @@ class MedusaStream(RESTStream):
             params["offset"] = next_page_token
         # filter by date
         start_date = self.get_starting_time(context)
-        if start_date:
+        if start_date and self.replication_key:
             start_date = start_date + datetime.timedelta(seconds=1)
             start_date = start_date.strftime("%Y-%m-%dT%H:%M:%SZ")
             params[f"{self.replication_key}[gt]"] = start_date
