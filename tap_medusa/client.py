@@ -77,7 +77,10 @@ class MedusaStream(RESTStream):
                 data=json.dumps(login_data),
                 headers=headers,
             )
-            self.validate_response(access_token)
+            try:
+                self.validate_response(access_token)
+            except Exception as e:
+                raise Exception(f"Failed during generating token: {e}")
             access_token = access_token.json()["access_token"]
             self._tap._config["access_token"] = access_token
             now = round((datetime.datetime.utcnow() + datetime.timedelta(minutes=60)).timestamp())
@@ -123,3 +126,15 @@ class MedusaStream(RESTStream):
             start_date = start_date.strftime("%Y-%m-%dT%H:%M:%SZ")
             params[f"{self.replication_key}[gt]"] = start_date
         return params
+    
+    def response_error_message(self, response: requests.Response) -> str:
+        if 400 <= response.status_code < 500:
+            error_type = "Client"
+        else:
+            error_type = "Server"
+
+        return (
+            f"{response.status_code} {error_type} Error: "
+            f"{response.reason} for url: {response.url} "
+            f"Response: {response.text}"
+        )
