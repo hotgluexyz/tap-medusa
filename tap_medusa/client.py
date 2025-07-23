@@ -30,13 +30,19 @@ class MedusaStream(RESTStream):
     additional_params = {}
 
     @property
-    def url_base(self):
-        base_url = self.config.get("base_url")
-        if base_url.endswith("/admin"):
-            return self.config.get("base_url")
-        else:
-            return f'{self.config.get("base_url")}/admin'
+    def base_url(self):
+        return self.config.get("base_url", "").rstrip("/")
 
+    @property
+    def url_base(self):
+        return f"{self.base_url}/admin" if not self.base_url.endswith("/admin") else self.base_url
+
+    @property
+    def auth_url(self):
+        if self.config.get("medusa_v2", False):
+            return f"{self.base_url}/auth/user/emailpass"
+        return f"{self.url_base}/auth/token"
+    
     @property
     def http_headers(self) -> dict:
         """Return the http headers needed."""
@@ -62,7 +68,11 @@ class MedusaStream(RESTStream):
         if not expires_in:
             return False
         return not ((expires_in - now) < 120)
-
+    def extract_access_token(self, response):
+        is_medusa_v2 = self.config.get("medusa_v2", False)
+        data = response.json()
+        return data["token"] if is_medusa_v2 else data["access_token"]
+    
     def get_access_token(self):
         headers = {"Content-Type": "application/json"}
         login_data = {
@@ -72,16 +82,17 @@ class MedusaStream(RESTStream):
         
         access_token = self._tap._config.get("access_token")
         if not self.is_token_valid():
-            access_token = requests.post(
-                url=f"{self.url_base}/auth/token",
-                data=json.dumps(login_data),
-                headers=headers,
+            response = requests.post(
+                    url=self.auth_url,
+                    data=json.dumps(login_data),
+                    headers=headers,
             )
             try:
-                self.validate_response(access_token)
+                self.validate_response(response)
             except Exception as e:
                 raise Exception(f"Failed during generating token: {e}")
-            access_token = access_token.json()["access_token"]
+            
+            access_token = self.extract_access_token(response)
             self._tap._config["access_token"] = access_token
             now = round((datetime.datetime.utcnow() + datetime.timedelta(minutes=60)).timestamp())
             self._tap._config["expires_in"] = now
