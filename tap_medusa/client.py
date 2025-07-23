@@ -31,7 +31,7 @@ class MedusaStream(RESTStream):
 
     @property
     def url_base(self):
-        base_url = self.config.get("base_url")
+        base_url = self.config.get("base_url", "").rstrip("/")
         if base_url.endswith("/admin"):
             return self.config.get("base_url")
         else:
