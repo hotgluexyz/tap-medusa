@@ -374,7 +374,7 @@ class OrdersStream(MedusaStream):
         th.Property("tax_rate", th.StringType),
         th.Property("draft_order_id", th.StringType),
         th.Property("canceled_at", th.DateTimeType),
-        th.Property("no_notification", th.StringType),
+        th.Property("no_notification", th.BooleanType),
         th.Property("sales_channel_id", th.StringType),
         th.Property("metadata", th.CustomType({"type": ["object", "string"]})),
         th.Property("billing_address", address),
