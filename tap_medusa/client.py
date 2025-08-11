@@ -1,5 +1,5 @@
 """REST client handling, including MedusaStream base class."""
-
+import backoff
 import datetime
 import json
 from typing import Any, Dict, Optional, Union
@@ -11,6 +11,7 @@ from singer.schema import Schema
 from singer_sdk.helpers.jsonpath import extract_jsonpath
 from singer_sdk.plugin_base import PluginBase as TapBaseClass
 from singer_sdk.streams import RESTStream
+from singer_sdk.exceptions import  RetriableAPIError
 
 
 class MedusaStream(RESTStream):
@@ -149,3 +150,14 @@ class MedusaStream(RESTStream):
             f"{response.reason} for url: {response.url} "
             f"Response: {response.text}"
         )
+
+    @backoff.on_exception(
+        backoff.expo,
+        (requests.exceptions.RequestException, RetriableAPIError),
+        max_tries=5,
+        jitter=backoff.full_jitter,
+    )
+    def _get_with_retries(self, url: str, *, headers: dict, params: dict) -> requests.Response:
+        resp = self.requests_session.get(url, headers=headers, timeout=self.timeout, params=params)
+        self.validate_response(resp) 
+        return resp
