@@ -180,20 +180,16 @@ class ProductsStream(MedusaStream):
             Complete product data with expanded address details
         """
         url = f"{self.url_base}/products/{product_id}"
-        headers = self.http_headers
         params = {
             "fields": "*categories"
         }
+        resp = self._get_with_retries(
+            url=url,
+            headers=self.http_headers,
+            params=params
+        )
+        return resp.json().get("product", {})
         
-        try:
-            response = self.requests_session.get(url, headers=headers, timeout=self.timeout, params=params)
-            self.validate_response(response)
-            product_data = response.json()
-            return product_data.get("product", {})
-        except Exception as e:
-            self.logger.warning(f"Failed to fetch product details for product {product_id}: {e}")
-            return {}
-
     def post_process(self, row: dict, context: dict = None) -> dict:
         """Post-process each product record to fetch complete details.
         
@@ -530,19 +526,15 @@ class OrdersStream(MedusaStream):
             Complete order data with expanded address details
         """
         url = f"{self.url_base}/orders/{order_id}"
-        headers = self.http_headers
         params = {
             "fields": "*customer,*sales_channel,*transactions"
         }
-        
-        try:
-            response = self.requests_session.get(url, headers=headers, timeout=self.timeout, params=params)
-            self.validate_response(response)
-            order_data = response.json()
-            return order_data.get("order", {})
-        except Exception as e:
-            self.logger.warning(f"Failed to fetch order details for order {order_id}: {e}")
-            return {}
+        resp = self._get_with_retries(
+            url=url,
+            headers=self.http_headers,
+            params=params
+        )
+        return resp.json().get("order", {})
 
     def post_process(self, row: dict, context: dict = None) -> dict:
         """Post-process each order record to fetch complete details.
