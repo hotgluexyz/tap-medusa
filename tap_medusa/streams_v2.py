@@ -205,12 +205,14 @@ class ProductsStream(MedusaStream):
             return row
         self.logger.info(f"Fetching complete product details for product {product_id}")
         complete_product = self.fetch_product_details(product_id)
-        
-        if complete_product:
-            return complete_product
-        else:
-            return row
 
+        if complete_product:
+            row = complete_product
+
+        if row.get("weight"):
+            row["weight"] = float(row["weight"])
+
+        return row
 
 order_summary = th.ObjectType(
     th.Property("paid_total", th.NumberType),
