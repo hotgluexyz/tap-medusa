@@ -5,6 +5,8 @@ data following the [Singer spec](https://github.com/singer-io/getting-started/bl
 
 ## Configuration
 
+A sample configuration file and full option reference are in the **[templates](templates/)** folder: use [templates/config.json](templates/config.json) as a starting point and see [templates/README.md](templates/README.md) for descriptions of each option.
+
 ### Accepted Config Options
 
 A full list of supported settings and capabilities for this
