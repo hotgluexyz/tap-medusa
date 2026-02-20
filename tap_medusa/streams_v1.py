@@ -1,6 +1,6 @@
 """Stream type classes for tap-medusa."""
 
-from singer_sdk import typing as th
+from hotglue_singer_sdk import typing as th
 
 from tap_medusa.client import MedusaStream
 

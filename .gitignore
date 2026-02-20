@@ -1,5 +1,6 @@
 # Secrets and internal config files
 **/.secrets/*
+.vscode/
 
 # Ignore meltano internal cache and sqlite systemdb
 
@@ -134,3 +135,4 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+.github/.DS_Store
