@@ -5,13 +5,12 @@ import json
 from typing import Any, Dict, Optional, Union
 
 import requests
-from memoization import cached
 from pendulum import parse
 from singer.schema import Schema
-from singer_sdk.helpers.jsonpath import extract_jsonpath
-from singer_sdk.plugin_base import PluginBase as TapBaseClass
-from singer_sdk.streams import RESTStream
-from singer_sdk.exceptions import  RetriableAPIError
+from hotglue_singer_sdk.helpers.jsonpath import extract_jsonpath
+from hotglue_singer_sdk.plugin_base import PluginBase as TapBaseClass
+from hotglue_singer_sdk.streams import RESTStream
+from hotglue_singer_sdk.exceptions import RetriableAPIError
 
 
 class MedusaStream(RESTStream):

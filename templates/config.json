@@ -1,0 +1,9 @@
+{
+  "base_url": "https://your-medusa-store.com",
+  "email": "admin@example.com",
+  "password": "xxxxxxxxxxxxxxxx",
+  "api_key": "",
+  "medusa_v2": false,
+  "user_agent": "tap-medusa/0.0.1",
+  "start_date": "2024-01-01T00:00:00Z"
+}
