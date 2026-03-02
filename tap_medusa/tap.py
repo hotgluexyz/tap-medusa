@@ -53,8 +53,13 @@ class TapMedusa(Tap):
     def discover_streams(self) -> List[Stream]:
         """Return a list of discovered streams."""
         if self.config.get("medusa_v2", False):
-            from tap_medusa.streams_v2 import OrdersStream as OrdersStreamV2, ProductsStream as ProductsStreamV2, ReturnsStream as ReturnsStreamV2
-            stream_types = [OrdersStreamV2, ProductsStreamV2, ReturnsStreamV2]
+            from tap_medusa.streams_v2 import (
+                DraftOrdersStream as DraftOrdersStreamV2,
+                OrdersStream as OrdersStreamV2,
+                ProductsStream as ProductsStreamV2,
+                ReturnsStream as ReturnsStreamV2,
+            )
+            stream_types = [OrdersStreamV2, ProductsStreamV2, ReturnsStreamV2, DraftOrdersStreamV2]
         else:
             stream_types = [OrdersStreamV1, ProductsStreamV1, ReturnsStreamV1]
         
