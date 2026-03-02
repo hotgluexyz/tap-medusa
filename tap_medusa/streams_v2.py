@@ -442,29 +442,58 @@ order_transaction = th.ObjectType(
     th.Property("updated_at", th.DateTimeType),
 )
 
-class OrdersStream(MedusaStream):
-    """Define custom stream.
-    
-    This stream fetches orders from the /admin/orders endpoint and then makes
-    subsequent requests to /admin/orders/{order_id} for each order to get
-    complete details including full shipping and billing addresses.
-    
-    Note: In Medusa v2, the list endpoint only returns address IDs, but the
-    individual order endpoint returns complete address objects.
-    """
 
-    name = "orders"
-    path = "/orders"
-    primary_keys = ["id"]
-    replication_key = "updated_at"
-    records_jsonpath = "$.orders[*]"
-    
-    additional_params = {
-        "fields": "id"
-    }
-    
-    schema = th.PropertiesList(
-        th.Property("payment_collections", th.ArrayType(payment_collection)),
+def _fetch_order_like_details(stream, record_id: str, path_segment: str, response_key: str) -> dict:
+    """Fetch full details for an order-like record (order or draft order).
+
+    Args:
+        stream: The stream instance (for url_base, _get_with_retries, http_headers).
+        record_id: ID of the record.
+        path_segment: URL path segment, e.g. 'orders' or 'draft-orders'.
+        response_key: Key in the JSON response, e.g. 'order' or 'draft_order'.
+
+    Returns:
+        The full record dict, or {} if not found.
+    """
+    url = f"{stream.url_base}/{path_segment}/{record_id}"
+    params = {"fields": "*customer,*sales_channel,*transactions"}
+    resp = stream._get_with_retries(
+        url=url,
+        headers=stream.http_headers,
+        params=params,
+    )
+    return resp.json().get(response_key, {})
+
+
+def _post_process_order_like(
+    row: dict,
+    stream,
+    path_segment: str,
+    response_key: str,
+    log_label: str,
+    context: dict = None,
+) -> dict:
+    """Post-process an order-like record by fetching full details.
+
+    Args:
+        row: Record from the list endpoint.
+        stream: The stream instance.
+        path_segment: e.g. 'orders' or 'draft-orders'.
+        response_key: e.g. 'order' or 'draft_order'.
+        log_label: For logging, e.g. 'order' or 'draft order'.
+
+    Returns:
+        Enriched row or original row if fetch fails.
+    """
+    record_id = row.get("id")
+    if not record_id:
+        return row
+    stream.logger.info(f"Fetching complete {log_label} details for {record_id}")
+    complete = _fetch_order_like_details(stream, record_id, path_segment, response_key)
+    return complete if complete else row
+
+_ORDER_LIKE_BASE_PROPERTIES = (
+    th.Property("payment_collections", th.ArrayType(payment_collection)),
         th.Property("id", th.StringType),
         th.Property("version", th.NumberType),
         th.Property("region_id", th.StringType),
@@ -515,49 +544,36 @@ class OrdersStream(MedusaStream):
         th.Property("metadata", th.CustomType({"type": ["object", "string"]})),
         th.Property("region", order_region),
         th.Property("credit_lines", th.ArrayType(th.CustomType({"type": ["object", "string"]}))),
+)
 
+class OrdersStream(MedusaStream):
+    """Define custom stream.
+    
+    This stream fetches orders from the /admin/orders endpoint and then makes
+    subsequent requests to /admin/orders/{order_id} for each order to get
+    complete details including full shipping and billing addresses.
+    
+    Note: In Medusa v2, the list endpoint only returns address IDs, but the
+    individual order endpoint returns complete address objects.
+    """
+
+    name = "orders"
+    path = "/orders"
+    primary_keys = ["id"]
+    replication_key = "updated_at"
+    records_jsonpath = "$.orders[*]"
+    
+    additional_params = {
+        "fields": "id"
+    }
+    
+    schema = th.PropertiesList(
+        *_ORDER_LIKE_BASE_PROPERTIES
     ).to_dict()
 
-    def fetch_order_details(self, order_id: str) -> dict:
-        """Fetch complete order details including full address information.
-        
-        Args:
-            order_id: The ID of the order to fetch
-            
-        Returns:
-            Complete order data with expanded address details
-        """
-        url = f"{self.url_base}/orders/{order_id}"
-        params = {
-            "fields": "*customer,*sales_channel,*transactions"
-        }
-        resp = self._get_with_retries(
-            url=url,
-            headers=self.http_headers,
-            params=params
-        )
-        return resp.json().get("order", {})
-
     def post_process(self, row: dict, context: dict = None) -> dict:
-        """Post-process each order record to fetch complete details.
-        
-        Args:
-            row: The order record from the list endpoint
-            context: Stream context
-            
-        Returns:
-            Enriched order record with complete address details
-        """
-        order_id = row.get("id")
-        if not order_id:
-            return row
-        self.logger.info(f"Fetching complete order details for order {order_id}")
-        complete_order = self.fetch_order_details(order_id)
-        
-        if complete_order:
-            return complete_order
-        else:
-            return row
+        """Post-process each order record to fetch complete details."""
+        return _post_process_order_like(row, self, "orders", "order", "order", context)
 
 
 class DraftOrdersStream(MedusaStream):
@@ -581,102 +597,12 @@ class DraftOrdersStream(MedusaStream):
     }
 
     schema = th.PropertiesList(
-        th.Property("payment_collections", th.ArrayType(payment_collection)),
-        th.Property("id", th.StringType),
-        th.Property("version", th.NumberType),
-        th.Property("region_id", th.StringType),
-        th.Property("customer_id", th.StringType),
-        th.Property("sales_channel_id", th.StringType),
-        th.Property("email", th.StringType),
-        th.Property("currency_code", th.StringType),
-        th.Property("items", th.ArrayType(order_item)),
-        th.Property("shipping_methods", th.ArrayType(order_shipping_method)),
-        th.Property("payment_status", th.StringType),
-        th.Property("fulfillment_status", th.StringType),
-        th.Property("summary", order_summary),
-        th.Property("created_at", th.DateTimeType),
-        th.Property("updated_at", th.DateTimeType),
-        th.Property("original_item_total", th.NumberType),
-        th.Property("original_item_subtotal", th.NumberType),
-        th.Property("original_item_tax_total", th.NumberType),
-        th.Property("item_total", th.NumberType),
-        th.Property("item_subtotal", th.NumberType),
-        th.Property("item_tax_total", th.NumberType),
-        th.Property("item_discount_total", th.NumberType),
-        th.Property("original_total", th.NumberType),
-        th.Property("original_subtotal", th.NumberType),
-        th.Property("original_tax_total", th.NumberType),
-        th.Property("total", th.NumberType),
-        th.Property("subtotal", th.NumberType),
-        th.Property("tax_total", th.NumberType),
-        th.Property("discount_total", th.NumberType),
-        th.Property("discount_tax_total", th.NumberType),
-        th.Property("gift_card_total", th.NumberType),
-        th.Property("gift_card_tax_total", th.NumberType),
-        th.Property("shipping_total", th.NumberType),
-        th.Property("shipping_subtotal", th.NumberType),
-        th.Property("shipping_tax_total", th.NumberType),
-        th.Property("shipping_discount_total", th.NumberType),
-        th.Property("original_shipping_total", th.NumberType),
-        th.Property("original_shipping_subtotal", th.NumberType),
-        th.Property("original_shipping_tax_total", th.NumberType),
-        th.Property("credit_line_total", th.NumberType),
-        th.Property("credit_line_subtotal", th.NumberType),
-        th.Property("credit_line_tax_total", th.NumberType),
-        th.Property("status", th.StringType),
-        th.Property("fulfillments", th.ArrayType(order_fulfillment)),
-        th.Property("sales_channel", th.CustomType({"type": ["object", "string"]})),
-        th.Property("customer", order_customer),
-        th.Property("shipping_address", order_shipping_address),
-        th.Property("billing_address", order_billing_address),
-        th.Property("display_id", th.NumberType),
-        th.Property("custom_display_id", th.StringType),
-        th.Property("transactions", th.ArrayType(order_transaction)),
-        th.Property("metadata", th.CustomType({"type": ["object", "string"]})),
-        th.Property("region", order_region),
-        th.Property("credit_lines", th.ArrayType(th.CustomType({"type": ["object", "string"]}))),
+        *_ORDER_LIKE_BASE_PROPERTIES
     ).to_dict()
 
-    def fetch_draft_order_details(self, draft_order_id: str) -> dict:
-        """Fetch complete draft order details including full address information.
-
-        Args:
-            draft_order_id: The ID of the draft order to fetch
-
-        Returns:
-            Complete draft order data with expanded address details
-        """
-        url = f"{self.url_base}/draft-orders/{draft_order_id}"
-        params = {
-            "fields": "*customer,*sales_channel,*transactions"
-        }
-        resp = self._get_with_retries(
-            url=url,
-            headers=self.http_headers,
-            params=params
-        )
-        return resp.json().get("draft_order", {})
-
     def post_process(self, row: dict, context: dict = None) -> dict:
-        """Post-process each draft order record to fetch complete details.
-
-        Args:
-            row: The draft order record from the list endpoint
-            context: Stream context
-
-        Returns:
-            Enriched draft order record with complete address details
-        """
-        draft_order_id = row.get("id")
-        if not draft_order_id:
-            return row
-        self.logger.info(f"Fetching complete draft order details for {draft_order_id}")
-        complete_draft_order = self.fetch_draft_order_details(draft_order_id)
-
-        if complete_draft_order:
-            return complete_draft_order
-        else:
-            return row
+        """Post-process each draft order record to fetch complete details."""
+        return _post_process_order_like(row, self, "draft-orders", "draft_order", "draft order", context)
 
 
 return_item = th.ObjectType(
