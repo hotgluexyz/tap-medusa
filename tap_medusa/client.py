@@ -150,10 +150,13 @@ class MedusaStream(RESTStream):
             f"Response: {response.text}"
         )
 
+    def backoff_max_tries(self):
+        return 10
+
     @backoff.on_exception(
         backoff.expo,
         (requests.exceptions.RequestException, RetriableAPIError),
-        max_tries=5,
+        max_tries=10,
         jitter=backoff.full_jitter,
     )
     def _get_with_retries(self, url: str, *, headers: dict, params: dict) -> requests.Response:
