@@ -16,6 +16,8 @@ from hotglue_singer_sdk.exceptions import RetriableAPIError
 class MedusaStream(RESTStream):
     """Medusa stream class."""
 
+    RETRY_MAX_TRIES = 10
+
     def __init__(
         self,
         tap: TapBaseClass,
@@ -151,12 +153,12 @@ class MedusaStream(RESTStream):
         )
 
     def backoff_max_tries(self):
-        return 10
+        return self.RETRY_MAX_TRIES
 
     @backoff.on_exception(
         backoff.expo,
         (requests.exceptions.RequestException, RetriableAPIError),
-        max_tries=10,
+        max_tries=RETRY_MAX_TRIES,
         jitter=backoff.full_jitter,
     )
     def _get_with_retries(self, url: str, *, headers: dict, params: dict) -> requests.Response:
