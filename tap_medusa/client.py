@@ -173,9 +173,9 @@ class MedusaStream(RESTStream):
     
     def validate_response(self, response: requests.Response) -> None:
         # check if response is a valid json
+        super().validate_response(response)
         try:
             response.json()
         except json.JSONDecodeError:
             raise RetriableAPIError(f"Response is not a valid JSON: {response.text}")
         
-        super().validate_response(response)
