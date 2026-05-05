@@ -41,9 +41,13 @@ class MedusaStream(RESTStream):
 
     @property
     def auth_url(self):
-        if self.config.get("medusa_v2", False):
+        if self.is_medusa_v2:
             return f"{self.base_url}/auth/user/emailpass"
         return f"{self.url_base}/auth/token"
+    
+    @property
+    def is_medusa_v2(self):
+        return self.config.get("medusa_v2", False)
     
     @property
     def http_headers(self) -> dict:
@@ -70,11 +74,17 @@ class MedusaStream(RESTStream):
         if not expires_in:
             return False
         return not ((expires_in - now) < 120)
+
     def extract_access_token(self, response):
-        is_medusa_v2 = self.config.get("medusa_v2", False)
         data = response.json()
-        return data["token"] if is_medusa_v2 else data["access_token"]
+        return data["token"] if self.is_medusa_v2 else data["access_token"]
     
+    @backoff.on_exception(
+        backoff.expo,
+        (RetriableAPIError),
+        max_tries=5,
+        jitter=backoff.full_jitter,
+    )
     def get_access_token(self):
         headers = {"Content-Type": "application/json"}
         login_data = {
@@ -92,7 +102,8 @@ class MedusaStream(RESTStream):
             try:
                 self.validate_response(response)
             except Exception as e:
-                raise Exception(f"Failed during generating token: {e}")
+                self.logger.error(f"Failed during generating token: {e}")
+                raise e
             
             access_token = self.extract_access_token(response)
             self._tap._config["access_token"] = access_token
@@ -137,7 +148,8 @@ class MedusaStream(RESTStream):
         if start_date and self.replication_key:
             start_date = start_date + datetime.timedelta(seconds=1)
             start_date = start_date.strftime("%Y-%m-%dT%H:%M:%SZ")
-            params[f"{self.replication_key}[gt]"] = start_date
+            operator = "$gt" if self.is_medusa_v2 else "gt"
+            params[f"{self.replication_key}[{operator}]"] = start_date
         return params
     
     def response_error_message(self, response: requests.Response) -> str:
@@ -165,3 +177,12 @@ class MedusaStream(RESTStream):
         resp = self.requests_session.get(url, headers=headers, timeout=self.timeout, params=params)
         self.validate_response(resp) 
         return resp
+    
+    def validate_response(self, response: requests.Response) -> None:
+        # check if response is a valid json
+        super().validate_response(response)
+        try:
+            response.json()
+        except json.JSONDecodeError:
+            raise RetriableAPIError(f"Response is not a valid JSON: {response.text}")
+        
