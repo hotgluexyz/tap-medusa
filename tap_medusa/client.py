@@ -41,7 +41,7 @@ class MedusaStream(RESTStream):
 
     @property
     def auth_url(self):
-        if self.config.get("medusa_v2", False):
+        if self.is_medusa_v2:
             return f"{self.base_url}/auth/user/emailpass"
         return f"{self.url_base}/auth/token"
     
@@ -79,6 +79,12 @@ class MedusaStream(RESTStream):
         data = response.json()
         return data["token"] if self.is_medusa_v2 else data["access_token"]
     
+    @backoff.on_exception(
+        backoff.expo,
+        (RetriableAPIError),
+        max_tries=5,
+        jitter=backoff.full_jitter,
+    )
     def get_access_token(self):
         headers = {"Content-Type": "application/json"}
         login_data = {
@@ -96,7 +102,8 @@ class MedusaStream(RESTStream):
             try:
                 self.validate_response(response)
             except Exception as e:
-                raise Exception(f"Failed during generating token: {e}")
+                self.logger.error(f"Failed during generating token: {e}")
+                raise e
             
             access_token = self.extract_access_token(response)
             self._tap._config["access_token"] = access_token
