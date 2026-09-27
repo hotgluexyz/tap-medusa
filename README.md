@@ -37,6 +37,9 @@ Sample config:
 
 You can easily run `tap-medusa` by itself or in a pipeline.
 
+To run a local Medusa backend, follow the
+[local development guide](docs/local-medusa.md).
+
 ### Executing the Tap Directly
 
 ```bash
@@ -51,4 +54,3 @@ tap-medusa --config CONFIG --discover > ./catalog.json
 pipx install poetry
 poetry install
 ```
-
