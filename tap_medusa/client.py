@@ -173,8 +173,12 @@ class MedusaStream(RESTStream):
         max_tries=RETRY_MAX_TRIES,
         jitter=backoff.full_jitter,
     )
-    def _get_with_retries(self, url: str, *, headers: dict, params: dict) -> requests.Response:
+    def _get_with_retries(
+        self, url: str, *, headers: dict, params: dict, allow_not_found: bool = False
+    ) -> requests.Response:
         resp = self.requests_session.get(url, headers=headers, timeout=self.timeout, params=params)
+        if allow_not_found and resp.status_code == 404:
+            return resp
         self.validate_response(resp) 
         return resp
     
@@ -185,4 +189,3 @@ class MedusaStream(RESTStream):
             response.json()
         except json.JSONDecodeError:
             raise RetriableAPIError(f"Response is not a valid JSON: {response.text}")
-        
