@@ -457,7 +457,7 @@ def _fetch_order_like_details(
         response_key: Key in the JSON response, e.g. 'order' or 'draft_order'.
 
     Returns:
-        The full record dict, or None if the detail endpoint returns 404.
+        The full record dict, or None if the requested order is not found.
     """
     url = f"{stream.url_base}/{path_segment}/{record_id}"
     params = {"fields": "*customer,*sales_channel,*transactions"}
@@ -468,6 +468,16 @@ def _fetch_order_like_details(
         allow_not_found=True,
     )
     if resp.status_code == 404:
+        try:
+            error = resp.json()
+        except ValueError:
+            error = {}
+        if not (
+            isinstance(error, dict)
+            and error.get("type") == "not_found"
+            and error.get("message") == f"Order id not found: {record_id}"
+        ):
+            stream.validate_response(resp)
         stream.logger.warning(
             f"Skipping {stream.name} record {record_id}: detail endpoint returned 404"
         )
