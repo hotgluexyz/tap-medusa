@@ -1,5 +1,7 @@
 """Stream type classes for tap-medusa-v2."""
 
+from __future__ import annotations
+
 from hotglue_singer_sdk import typing as th
 
 from tap_medusa.client import MedusaStream
@@ -443,7 +445,9 @@ order_transaction = th.ObjectType(
 )
 
 
-def _fetch_order_like_details(stream, record_id: str, path_segment: str, response_key: str) -> dict:
+def _fetch_order_like_details(
+    stream, record_id: str, path_segment: str, response_key: str
+) -> dict | None:
     """Fetch full details for an order-like record (order or draft order).
 
     Args:
@@ -453,7 +457,7 @@ def _fetch_order_like_details(stream, record_id: str, path_segment: str, respons
         response_key: Key in the JSON response, e.g. 'order' or 'draft_order'.
 
     Returns:
-        The full record dict, or {} if not found.
+        The full record dict, or None if the requested order is not found.
     """
     url = f"{stream.url_base}/{path_segment}/{record_id}"
     params = {"fields": "*customer,*sales_channel,*transactions"}
@@ -461,8 +465,24 @@ def _fetch_order_like_details(stream, record_id: str, path_segment: str, respons
         url=url,
         headers=stream.http_headers,
         params=params,
+        allow_not_found=True,
     )
-    return resp.json().get(response_key, {})
+    if resp.status_code == 404:
+        try:
+            error = resp.json()
+        except ValueError:
+            error = {}
+        if not (
+            isinstance(error, dict)
+            and error.get("type") == "not_found"
+            and error.get("message") == f"Order id not found: {record_id}"
+        ):
+            stream.validate_response(resp)
+        stream.logger.warning(
+            f"Skipping {stream.name} record {record_id}: detail endpoint returned 404"
+        )
+        return None
+    return resp.json().get(response_key) or {}
 
 
 def _post_process_order_like(
@@ -471,8 +491,8 @@ def _post_process_order_like(
     path_segment: str,
     response_key: str,
     log_label: str,
-    context: dict = None,
-) -> dict:
+    context: dict | None = None,
+) -> dict | None:
     """Post-process an order-like record by fetching full details.
 
     Args:
@@ -483,14 +503,16 @@ def _post_process_order_like(
         log_label: For logging, e.g. 'order' or 'draft order'.
 
     Returns:
-        Enriched row or original row if fetch fails.
+        Enriched or original row, or None if the detail endpoint returns 404.
     """
     record_id = row.get("id")
     if not record_id:
         return row
     stream.logger.info(f"Fetching complete {log_label} details for {record_id}")
     complete = _fetch_order_like_details(stream, record_id, path_segment, response_key)
-    return complete if complete else row
+    if complete is None:
+        return None
+    return complete or row
 
 _ORDER_LIKE_BASE_PROPERTIES = (
     th.Property("payment_collections", th.ArrayType(payment_collection)),
@@ -571,7 +593,7 @@ class OrdersStream(MedusaStream):
         *_ORDER_LIKE_BASE_PROPERTIES
     ).to_dict()
 
-    def post_process(self, row: dict, context: dict = None) -> dict:
+    def post_process(self, row: dict, context: dict | None = None) -> dict | None:
         """Post-process each order record to fetch complete details."""
         return _post_process_order_like(row, self, "orders", "order", "order", context)
 
@@ -600,7 +622,7 @@ class DraftOrdersStream(MedusaStream):
         *_ORDER_LIKE_BASE_PROPERTIES
     ).to_dict()
 
-    def post_process(self, row: dict, context: dict = None) -> dict:
+    def post_process(self, row: dict, context: dict | None = None) -> dict | None:
         """Post-process each draft order record to fetch complete details."""
         return _post_process_order_like(row, self, "draft-orders", "draft_order", "draft order", context)
 
